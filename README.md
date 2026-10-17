@@ -45,7 +45,22 @@ docker run --rm -p 8080:8080 \
 
 `--stop-timeout 60`: the engine releases its locked RAM on SIGTERM, which takes >10 s.
 
-Environment (read by upstream `docker-entrypoint.sh`): `FAMILY`, `MODEL`, `CONTEXT`,
+Environment added by this image (the entrypoint is `strix-entrypoint.sh`, which wraps upstream's):
+
+- `PARALLEL` (2 to 8): conversations decoded together (Strata's batch slots, `docs/BATCHING.md`); `1` or
+  unset: one request at a time. Upstream's entrypoint has no variable for it: it is written into the
+  config's `"parallel"` at every start.
+- `CONTEXT` is also applied to an existing config at every start (upstream only reads it at install or with
+  `REINSTALL=1`).
+- `STRATA_ARENA_MMAP=1` (read by the engine): the experts are mapped from a file (`experts.bin`, ~25 GB for the
+  Coder) instead of being read into RAM next to the GPU's copy. On a unified-memory machine like the Strix
+  Halo that copy is 23 GiB of RAM held twice. Measured on a Ryzen AI Max+ 395, Coder IQ1_M, 262144 tokens
+  and 4 slots: 68 GiB used (90 without it, which stalls the machine), same prefill speed. The engine writes the
+  file at the first start that has the variable and maps it from the next start on, but that first start still
+  loads the experts in RAM; the wrapper therefore runs it small (`PARALLEL=1`, `CONTEXT=65536`), stops it once
+  the file is written and starts again on the real settings, in the same container.
+
+Environment read by upstream `docker-entrypoint.sh`: `FAMILY`, `MODEL`, `CONTEXT`,
 `VISION`, `KV`, `GPU`, `GPUS`, `LOW_RAM`, `HOST`, `PORT`, `API_KEY`, `GGUF_DIR`,
 `RESIDENT_BUDGET_GIB`, `KV_STREAMING`, `REINSTALL`, `CONFIG`.
 Changing a setting for a model that is already installed needs `REINSTALL=1`.

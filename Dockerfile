@@ -65,6 +65,9 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=600s --retries=3 \
     CMD curl -fsS http://127.0.0.1:${PORT}/health || exit 1
 
-# Upstream entrypoint: first start runs `setup.py --setup --yes` (downloads the
-# model into /data), later starts reuse /data/config.
-ENTRYPOINT ["./docker-entrypoint.sh"]
+# strix-entrypoint.sh wraps upstream's docker-entrypoint.sh (first start: `setup.py --setup --yes`
+# downloads the model into /data, later starts reuse /data/config). It applies PARALLEL / CONTEXT to
+# the existing config and handles STRATA_ARENA_MMAP, see the README.
+COPY strix-entrypoint.sh patch-config.py /opt/strata/
+RUN chmod +x /opt/strata/strix-entrypoint.sh /opt/strata/patch-config.py
+ENTRYPOINT ["./strix-entrypoint.sh"]
