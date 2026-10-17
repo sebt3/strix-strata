@@ -11,9 +11,9 @@ Unofficial, not affiliated with the Strata author.
 
 ## Status
 
-Alpha, **not yet built**: `build-engine.py` calls Strata internals
-(`setup.get_llama_cpp`, `setup.build_engine_hip`) with a synthesized GPU dict.
-The first `docker build` will tell whether those assumptions hold.
+Alpha. Works on a Strix Halo (gfx1151): the Coder variant of Qwen3.8-Flash-Next serves ~42 tok/s
+(decode) and ~650 tok/s (prefill). `build-engine.py` calls Strata internals
+(`setup.get_llama_cpp`, `setup.build_engine_hip`) with a synthesized GPU dict, which upstream may break.
 
 ## Build
 
@@ -24,10 +24,12 @@ docker build --build-arg STRATA_REF=v0.1.45 -t strix-strata:dev .
 ```
 
 Build args: `STRATA_REF` (upstream tag, pin it), `GPU_ARCH` (default `gfx1151`),
-`BUILD_VISION` (`1` builds the CPU image encoder, default `0`).
+`BUILD_VISION` (`1` builds the CPU image encoder, the default).
 
-The image is large (the ROCm wheels, ~11 GB, are kept in the venv). Pruning the unused
-ROCm libraries is a TODO.
+The ROCm devel wheel is pruned after the build (compilers, benchmarks, headers: ~7 GB): the
+runtime has no host compiler, so nothing could be rebuilt there anyway. Its `lib/` is kept whole
+(the engine loads LLVM/comgr from it and the BLAS libraries read kernel catalogs lazily). The CPU
+image encoder is built into the image (`BUILD_VISION=1`), since it cannot be compiled at runtime.
 
 ## Run
 

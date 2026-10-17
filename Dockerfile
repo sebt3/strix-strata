@@ -9,7 +9,7 @@ FROM docker.io/library/ubuntu:${UBUNTU_TAG} AS builder
 ARG STRATA_REPO=https://github.com/Niko1221/Strata.git
 ARG STRATA_REF=v0.1.45
 ARG GPU_ARCH=gfx1151
-ARG BUILD_VISION=0
+ARG BUILD_VISION=1
 
 RUN DEBIAN_FRONTEND=noninteractive apt-get update \
  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
@@ -26,6 +26,15 @@ RUN python3 -m venv .venv \
 COPY build-engine.py /tmp/build-engine.py
 RUN GPU_ARCH=${GPU_ARCH} BUILD_VISION=${BUILD_VISION} .venv/bin/python /tmp/build-engine.py \
  && rm -rf build-hip build-vision
+
+# Prune the ROCm devel wheel: its compilers, benchmarks, docs and headers (~7 GB) are only needed
+# to build the engine above. The runtime stage has no host compiler, so nothing can be rebuilt
+# there anyway. lib/ stays whole: the engine loads libLLVM/libclang-cpp/comgr from it and
+# hipBLASLt/rocBLAS read their kernel catalogs from it lazily (not visible in /proc/maps).
+RUN D=.venv/lib/python3.12/site-packages/_rocm_sdk_devel \
+ && du -sh /opt/strata \
+ && rm -rf $D/bin $D/clients $D/share $D/include $D/tests $D/libexec \
+ && du -sh /opt/strata && test -x engine/strata
 
 # ─── Stage 2: Runtime ────────────────────────────────────────────────────────
 FROM docker.io/library/ubuntu:${UBUNTU_TAG} AS runtime
